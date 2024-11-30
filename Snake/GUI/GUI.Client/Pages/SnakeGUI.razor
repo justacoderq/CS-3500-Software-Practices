@@ -1,0 +1,446 @@
+﻿<!-- <authors>Kyleigh Messinger and Prachi Aswani</authors> -->
+<!-- <version>22 November, 2024</version>  -->
+@page "/snake"
+@rendermode InteractiveServer
+@using Blazor.Extensions
+@using Blazor.Extensions.Canvas
+@using Blazor.Extensions.Canvas.Canvas2D
+@using System.Numerics
+@using System.Diagnostics
+@using System.Text.Json
+@using GUI.Client.Models
+@using GUI.Client.Controllers
+@inject IJSRuntime JsRuntime;
+
+<PageTitle> Snake </PageTitle>
+
+<!-- Hidden background and wall images for the game-->
+<img @ref="backgroundImage" id="bgImage" src="images/Background.png" alt="image" style="display:none;" />
+<img @ref="wallImageElement" id="wallImage" src="images/WallSprite.png" alt="image" style="display:none;" />
+
+<div>
+    <!-- Input fields for player name, server IP and port-->
+    <label for="PlayerName">Player Name:</label>
+    <input @bind="PlayerName"  placeholder="Enter name" />
+    <label for="ServerIP">Server Address:</label>
+    <input @bind="ServerIP"  placeholder="Server IP/ Hostname :" />
+    <label for="Port">Server Port:</label>
+    <input @bind="Port" type="number" placeholder="Server IP/ Hostname :" />
+
+    <!-- Connect or Disconnect button-->
+    @if (connected)
+    {
+        <button class="btn btn-danger" @onclick="Disconnect">Disconnect</button>
+    }
+    else
+    {
+        <button class="btn btn-primary" @onclick="Connect">Connect</button>
+    }
+
+</div>
+
+<!-- Error Popup to display connection errors-->
+@if (ShowErrorPopup)
+{
+    <div class="popup-overlay">
+        <div class="popup-content">
+            <h2>Connection Error</h2>
+            <p>@ConnectionErrorMessage</p>
+            <button class="btn btn-primary" @onclick="() => ShowErrorPopup = false">Close</button>
+        </div>
+    </div>
+}
+
+<!-- Canvas for rendering the game -->
+<div id="snakeCanvas" style="position: fixed; width: 100%; height: 100%">
+    <BECanvas Width="1000" Height="1000" @ref="canvasReference"></BECanvas>
+</div>
+
+
+@code
+{
+    /// <summary>
+    /// Canvas reference and context
+    /// </summary>
+    private BECanvasComponent canvasReference = null!;
+    private Canvas2DContext context = null!;
+    private IJSObjectReference jsModule = null!;
+
+    /// <summary>
+    /// View Dimensions
+    /// </summary>
+    private const int viewHeight = 1000;
+    private const int viewWidth = 1000;
+
+    /// <summary>
+    /// Zoom Factor
+    /// </summary>
+    private float ZoomFactor = 1.0f;
+
+    /// <summary>
+    /// Colors for snake players
+    /// </summary>
+    private List<string> colors = ["blue", "black", "purple", "red", "orange", "yellow", "green", "grey", "lightblue"];
+
+    /// <summary>
+    /// References for images
+    /// </summary>
+    private ElementReference backgroundImage;
+    private ElementReference wallImageElement;
+
+    /// <summary>
+    /// Reference for PlayerName
+    /// </summary>
+    private string PlayerName = "PlayerName";
+
+    /// <summary>
+    /// Reference for ServerIP
+    /// </summary>
+    private string ServerIP = "localhost";
+
+    /// <summary>
+    /// Reference for Port
+    /// </summary>
+    private int Port = 11000;
+
+    /// <summary>
+    /// Reference for the World object
+    /// </summary>
+    private World TheWorld = new World();
+
+    /// <summary>
+    /// A network controller instance
+    /// </summary>
+    private NetworkController controller = new ();
+
+    /// <summary>
+    /// Indicates the connection status
+    /// </summary>
+    private bool connected = false;
+
+    /// <summary>
+    /// Log for displaying connection errors
+    /// </summary>
+    private List<string> ExceptionLog = new();
+
+    /// <summary>
+    /// Default Connection message
+    /// </summary>
+    private string ConnectionErrorMessage = string.Empty;
+
+    /// <summary>
+    /// Error Handling flag for popup
+    /// </summary>
+    private bool ShowErrorPopup = false;
+
+    /// <summary>
+    /// Override method to initialize canvas and start the game loop
+    /// </summary>
+    /// <param name="firstRender"></param>
+    /// <returns></returns>
+    protected override async Task OnAfterRenderAsync( bool firstRender )
+    {
+        if ( firstRender )
+        {
+            // Import JS modules and initialize canvas
+            jsModule = await JsRuntime.InvokeAsync<IJSObjectReference>( "import", "./Pages/SnakeGUI.razor.js" );
+            context = await canvasReference.CreateCanvas2DAsync();
+            await JsRuntime.InvokeAsync<object>( "initRenderJS", DotNetObjectReference.Create( this ) );
+
+            // Start the game loop                            
+            StartGameLoop();
+        }
+    }
+
+    /// <summary>
+    /// Connects to the Server by running the network loop in a new thread
+    /// </summary>
+    private void Connect()
+    {
+        try
+        {
+            // Extracts any errors from network controller through delegate
+            controller.NetworkErrorOccurred += HandleNetworkError;
+
+            // Runs the HandleNetwork to recieve data in a new thread
+            new Thread(() => controller.handleNetwork(PlayerName,Port,ServerIP,TheWorld)).Start();
+
+            // Connected succesfully
+            connected = true;
+
+            // Hides popup initially
+            ShowErrorPopup = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            // Logs the exception
+            HandleNetworkError(ex);
+        }
+    }
+
+    /// <summary>
+    /// Disconnects from the server using Network Controller <see cref="Disconnect"/>see 
+    /// method
+    /// </summary>
+    private void Disconnect()
+    {
+        try
+        {
+            ShowErrorPopup = false;
+            isComponentActive = false;  // Stop the game loop
+            controller.Disconnect(TheWorld);  // Disconnect from the server
+            connected = false;  // Update connection status
+            StateHasChanged();  // Trigger UI update
+        }
+        catch (Exception ex)
+        {
+            // Log the error
+            Debug.WriteLine($"Disconnect error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handle network errors and displays error messages
+    /// </summary>
+    /// <param name="ex"> The exception to be thrown </param>
+    private void HandleNetworkError(Exception ex)
+    {
+        InvokeAsync(async () =>
+        {
+            // From : StackOverflow
+            await JsRuntime.InvokeVoidAsync("alert", $"Connection Error: {ex.Message}");
+            connected = false;
+            StateHasChanged();
+        });
+    }
+
+    /// <summary>
+    /// Flag to control the game loop
+    /// </summary>
+    private bool isComponentActive = true; 
+
+    private async void StartGameLoop()
+    {
+        // Continously draw the game
+        while (isComponentActive)
+        {
+            try
+            {
+                Thread.Sleep(20);
+                await DrawGame(TheWorld, context);
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                // Error logging
+                HandleNetworkError(ex);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Draw the game on the canvas starting off with the backgorund, walls
+    /// and other objects sent by the server
+    /// </summary>
+    /// <param name="world"> Representation of the current world </param>
+    /// <param name="context"> used to render graphics inside the canvas element </param>
+    /// <returns> A <see cref="Task"/> that represents the asynchronous drawing operation </returns>
+    private async Task DrawGame(World world, Canvas2DContext context)
+    {
+        // Sets the world color as lightblue
+        await context.SetFillStyleAsync("lightblue");
+
+        // World's copy to avoid race conditions
+        World worldCopy;
+
+        // Lock the operation since it is modifying enumeration
+        lock (TheWorld)
+        {
+            if (!world.Snakes.ContainsKey(world.playerID))
+            {
+                return;
+            }
+
+            // Create a world copy
+            worldCopy = new World(world);
+        }
+
+        // Clear before drawing
+        await context.BeginBatchAsync();
+        await context.SetFillStyleAsync("lightblue");
+        await context.FillRectAsync(0, 0, viewWidth, viewHeight);
+
+        try
+        {
+            // Center the player's view
+            await context.BeginPathAsync();
+            await context.RectAsync(0, 0, viewWidth, viewHeight);
+            await context.ClipAsync();
+
+            // Unscale at the end
+            await context.SaveAsync();
+
+            var head = worldCopy.Snakes[worldCopy.playerID]?.head ?? new Snake().head;
+
+            // Center on origin
+            await context.TranslateAsync(viewWidth / 2, viewHeight / 2);
+
+            await context.ScaleAsync(ZoomFactor, ZoomFactor);
+            await context.TranslateAsync(-head.X, -head.Y);
+
+            // Draw the background
+            await context.DrawImageAsync(backgroundImage, -worldCopy.width / 2, -worldCopy.height / 2, worldCopy.width, worldCopy.height);
+
+            // Draw walls
+            foreach (var wall in worldCopy.Walls.Values)
+            {
+                foreach (Point2D point2D in wall.createParts())
+                {
+                    await context.DrawImageAsync(wallImageElement, point2D.X - 25, point2D.Y - 25, 50, 50);
+                }
+            }
+
+            // Draw powerups
+            foreach (var powerups in worldCopy.Powerups.Values)
+            {
+                await context.SetFillStyleAsync("red");
+                if (powerups.timeLeft > 0)
+                {
+                    powerups.timeLeft--;
+                    var expand = FixedConstants.blastTime - powerups.timeLeft;
+                    await context.SetLineWidthAsync(5);
+                    await context.SetStrokeStyleAsync($"rgb(255,0,0,{(float)powerups.timeLeft / FixedConstants.blastTime})");
+                    await context.BeginPathAsync();
+                    await context.ArcAsync(powerups.loc.X, powerups.loc.Y, 2 + expand, 0, 2 * Math.PI);
+                    await context.StrokeAsync();
+
+                    lock (TheWorld)
+                    {
+                        if (powerups.timeLeft == 0)
+                        {
+                            world.Powerups.Remove(powerups.power);
+                        }
+                    }
+                }
+                else
+                {
+                    await context.BeginPathAsync();
+                    await context.ArcAsync(powerups.loc.X, powerups.loc.Y, 8, 0, 2 * Math.PI);
+                    await context.FillAsync();
+
+                    // Add a circular border closely around the power-up
+                    await context.SetStrokeStyleAsync("yellow");
+                    await context.SetLineWidthAsync(2);
+                    await context.BeginPathAsync();
+                    await context.ArcAsync(powerups.loc.X, powerups.loc.Y, 9, 0, 2 * Math.PI); // Slightly larger radius for the border
+                    await context.StrokeAsync();
+                }
+            }
+
+            // Draw all snakes
+            foreach (var snake in worldCopy.Snakes.Values)
+            {
+                await DrawSnake(snake, context);
+            }
+
+
+        }
+        catch (Exception e)
+        {
+            // Error logging
+            Debug.WriteLine(e.Message);
+            HandleNetworkError(e);
+        }
+        finally
+        {
+            // To stop the snake from flickering
+            await context.RestoreAsync();
+            await context.EndBatchAsync();
+            StateHasChanged();
+        }
+
+    }
+
+    /// <summary>
+    /// Draws an individual snake on the canas
+    /// </summary>
+    /// <param name="snake"> the snake to draw </param>
+    /// <param name="context"> used to render graphics inside the canvas element </param>
+    /// <returns> A <see cref="Task"/> that represents the asynchronous drawing operation </returns>
+    private async Task DrawSnake(Snake snake, Canvas2DContext context)
+    {
+        // If the snake is alive, set its color
+        if (snake.alive)
+        {
+            await context.SetStrokeStyleAsync(colors[snake.snake % colors.Count]);
+        }
+        else
+        {
+            // If dead, make it look red for a brief moment
+            await context.SetStrokeStyleAsync("red");
+        }
+
+        // Draw Snake's shape
+        await context.SetLineCapAsync(LineCap.Round);
+        await context.SetLineWidthAsync(10);
+        await context.SetLineJoinAsync(LineJoin.Round);
+        await context.BeginPathAsync();
+        await context.MoveToAsync(snake.tail.X, snake.tail.Y);
+
+        // Draw the snake using parts
+        foreach(var part in snake.body[1..])
+        {
+            await context.LineToAsync(part.X, part.Y);
+        }
+        await context.StrokeAsync();
+
+        // Display the player's name and score near the snake's head
+        if (snake.alive)
+        {
+            var playerName = snake.name ?? "Unknown";
+            var playerScore = snake.score.ToString();
+
+            await context.SetFontAsync("14px Arial");
+            await context.SetFillStyleAsync("white");
+
+            // Display the text slightly above the snake's head
+            float textX = snake.head.X - 20; 
+            float textY = snake.head.Y - 20;
+
+            await context.FillTextAsync($"{playerName} ({playerScore})", textX, textY);
+        }
+    }
+
+    /// <summary>
+    /// Handles user inputs through keys by calling NetworkController method <see cref="handleKeyPress"/>
+    /// Handles key press events for controlling the snake's movement in the game
+    /// </summary>
+    /// <param name="key"> The key pressed </param>
+    [JSInvokable]
+    public void HandleKeyPress( string key )
+    {
+        if (!connected)
+        {
+            return;
+        }
+
+        // Zoom in
+        if(key == "m")
+        {
+            ZoomFactor *= 1.1f;
+            return;
+        }
+
+        // Zoom out
+        else if(key == "n")
+        {
+            ZoomFactor /= 1.1f;
+            return;
+        }
+
+        // Handle other key presses
+        controller.handleKeyPress(key);
+    }
+}
+

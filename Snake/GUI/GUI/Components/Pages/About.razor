@@ -1,0 +1,84 @@
+﻿@page "/"
+
+<PageTitle>About</PageTitle>
+
+<div style="font-family: 'Arial', sans-serif; color: #333; line-height: 1.6; max-width: 900px; margin: auto;">
+    <h1 style="text-align: center; font-size: 2.5rem; color: #4CAF50; margin-top: 1rem;">🎮 Welcome to Our Snake Game 🐍</h1>
+    <p style="text-align: center; font-size: 1.2rem; margin-bottom: 2rem;">
+        Dive into our multiplayer Snake Game! Designed for a fun, dynamic experience, our game features thoughtful architecture and user-friendly gameplay mechanics.
+    </p>
+
+    <section style="margin-bottom: 3rem;">
+        <h2 style="color: #FF9800;">🧩 What Our Game Is About</h2>
+        <p>Our Snake Game revolves around classic gameplay with a modern twist:</p>
+        <ul>
+            <li>🐍 Control your snake, slither through the world, and collect powerups to grow longer.</li>
+            <li>🧱 Snakes cannot pass through walls. If they try, it’s game over for them!</li>
+            <li>🌍 Edge-of-the-world behavior is undefined unless surrounded by walls.</li>
+            <li>🍎 Powerups increase the snake's length by a fixed amount, encouraging strategic play.</li>
+            <li>☠️ Crashing into walls or other snakes results in respawning with a shorter snake after a delay.</li>
+        </ul>
+    </section>
+
+    <section style="margin-bottom: 3rem;">
+        <h2 style="color: #2196F3;">🎨 How It Looks</h2>
+        <p>Our game’s visual design is simple yet effective, with attention to clarity and usability:</p>
+        <ul>
+            <li>Snakes are colorful, smooth lines with a 10-pixel stroke width for visibility.</li>
+            <li>Powerups are bright red squares with yellow borders, sized at 16x16 pixels.</li>
+            <li>Walls are solid blocks, rendered as 50x50 pixel segments to create obstacles.</li>
+        </ul>
+        <p>🎯 To keep gameplay focused, your snake is always centered on the canvas for smooth and intuitive navigation.</p>
+    </section>
+
+    <section style="margin-bottom: 3rem;">
+        <h2 style="color: #F44336;">🌍 World-Space vs. Image-Space</h2>
+        <p>
+            Our game balances two spaces:
+        </p>
+        <ul>
+            <li>World-Space: The center of the game world is at (0, 0), with coordinates extending from <code>-worldSize / 2</code> to <code>+worldSize / 2</code>.</li>
+            <li>Image-Space: The top-left corner of the screen is (0, 0). We dynamically adjust the canvas so your snake stays centered, even in large worlds.</li>
+        </ul>
+        <p>This ensures consistency and immersion, no matter where you move.</p>
+    </section>
+
+    <section style="margin-bottom: 3rem;">
+        <h2 style="color: #673AB7;">🛠️ How We Built the Game</h2>
+        <p>We structured our game using three main components:</p>
+        <ul>
+            <li><strong>Model:</strong> Tracks all in-game entities, including snakes, walls, powerups, and the world size.</li>
+            <li><strong>Controller:</strong> Handles server communication, processes player inputs, and updates the model.</li>
+            <li><strong>View:</strong> Renders the game world using <code>Blazor.Extensions.Canvas</code>, ensuring a polished and engaging interface.</li>
+        </ul>
+    </section>
+
+    <section style="margin-bottom: 3rem;">
+        <h2 style="color: #00BCD4;">🏆 Features We’re Proud Of</h2>
+        <ul>
+            <li>✨ Name customization and server connection via IP address or hostname.</li>
+            <li>🔌 Select a connection port and receive helpful error messages with retry options.</li>
+            <li>🎨 Dynamic rendering of snakes, powerups, walls, and player scores.</li>
+            <li>💡 Unique player colors (for the first 8) with reusable options for additional players.</li>
+            <li>📛 Snake names and scores dynamically appear near their heads for a personal touch.</li>
+            <li>
+                💥 Fun effects:
+                <ul>
+                    <li>Zoom in and out using <kbd>m</kbd> and <kbd>n</kbd> keys.</li>
+                    <li>Crash animations where snakes flash red briefly.</li>
+                    <li>Powerup effects with satisfying visual feedback.</li>
+                </ul>
+            </li>
+            <li>🚪 Dedicated disconnect button. While reconnecting isn’t implemented, Professor Kopta confirmed it’s unnecessary for this version.</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2 style="color: #E91E63;">🚀 Extras and Design Choices</h2>
+        <ul>
+            <li>⚡ High-performance optimization for smooth gameplay, even at 50+ FPS.</li>
+            <li>🌟 Polished animations, including score updates, crash effects, and dynamic zooming.</li>
+            <li>🎮 Thoughtful user experience design, with seamless interactions and feedback.</li>
+        </ul>
+    </section>
+</div>
