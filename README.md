@@ -96,4 +96,4 @@ The game is structured using three main components:
 This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details. Please do not copy code, it counts under Academic Misconduct
 
 ---
-
+```dotnet
